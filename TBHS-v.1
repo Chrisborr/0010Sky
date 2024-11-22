@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍上傳網站</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 1em 0;
+        }
+        main {
+            width: 80%;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+        }
+        form {
+            margin-bottom: 30px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            width: 100%;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        .book-list {
+            margin-top: 20px;
+        }
+        .book {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            padding: 15px 0;
+        }
+        .book img {
+            width: 80px;
+            height: 120px;
+            object-fit: cover;
+            margin-right: 20px;
+        }
+        .book-info {
+            flex-grow: 1;
+        }
+        .book-info h3 {
+            margin: 0;
+            color: #333;
+        }
+        .book-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .book-info p.price {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        #chart_div {
+            width: 100%;
+            height: 500px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>書籍上傳網站</h1>
+</header>
+
+<main>
+    <h2>上傳書籍</h2>
+    <p>這是一個上傳二手書籍的交易平台，請上傳你的二手書，然後公布價格，並選擇系所。還有下面的 google chart 會根據系所發布書籍的數量顯示。</p>
+    <p>因為需要手動上傳資料，所以使用者上傳之後才會有顯示出來。</p>
+    <form id="bookForm">
+        <label for="title">書籍名稱:</label>
+        <input type="text" id="title" name="title" required>
+
+        <label for="author">作者:</label>
+        <input type="text" id="author" name="author" required>
+
+        <label for="price">價格 (NTD):</label>
+        <input type="number" id="price" name="price" required>
+
+        <label for="department">選擇系所:</label>
+        <select id="department" name="department" required>
+            <option value="資管系">資管系</option>
+            <option value="資傳系">資傳系</option>
+            <option value="資工系">資工系</option>
+            <option value="資英系">資英系</option>
+        </select>
+
+        <label for="bookImage">上傳封面照片:</label>
+        <input type="file" id="bookImage" name="bookImage" accept="image/*" required>
+
+        <input type="submit" value="上傳書籍">
+    </form>
+
+    <div class="book-list" id="bookList">
+        <h2>書籍列表</h2>
+    </div>
+
+    <!-- Google Charts -->
+    <div id="chart_div"></div>
+</main>
+
+<script>
+    const bookForm = document.getElementById('bookForm');
+    const bookList = document.getElementById('bookList');
+    const departmentCounts = {
+        "資管系": 0,
+        "資傳系": 0,
+        "資工系": 0,
+        "資英系": 0
+    };
+
+    // 从 localStorage 加载数据
+    function loadBooks() {
+        const storedBooks = localStorage.getItem('books');
+        if (storedBooks) {
+            const books = JSON.parse(storedBooks);
+            books.forEach(book => {
+                addBookToList(book.title, book.author, book.price, book.department, book.image);
+                departmentCounts[book.department]++;
+            });
+            drawChart();
+        }
+    }
+
+    // 保存数据到 localStorage
+    function saveBooks(book) {
+        let books = localStorage.getItem('books');
+        if (books) {
+            books = JSON.parse(books);
+        } else {
+            books = [];
+        }
+        books.push(book);
+        localStorage.setItem('books', JSON.stringify(books));
+    }
+
+    bookForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const title = document.getElementById('title').value;
+        const author = document.getElementById('author').value;
+        const price = document.getElementById('price').value;
+        const department = document.getElementById('department').value;
+        const bookImage = document.getElementById('bookImage').files[0];
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const imageData = e.target.result;
+
+            const book = {
+                title: title,
+                author: author,
+                price: price,
+                department: department,
+                image: imageData
+            };
+
+            addBookToList(title, author, price, department, imageData);
+            saveBooks(book);
+            departmentCounts[department]++;
+            drawChart();
+        };
+
+        if (bookImage) {
+            reader.readAsDataURL(bookImage);
+        }
+
+        bookForm.reset();
+    });
+
+    // 将书籍添加到列表中
+    function addBookToList(title, author, price, department, imageData) {
+        const book = document.createElement('div');
+        book.classList.add('book');
+
+        book.innerHTML = `
+            <img src="${imageData}" alt="書籍封面">
+            <div class="book-info">
+                <h3>${title}</h3>
+                <p>作者: ${author}</p>
+                <p>系所: ${department}</p>
+                <p class="price">價格: NT$${price}</p>
+            </div>
+        `;
+
+        bookList.appendChild(book);
+    }
+
+    // 加载 Google Charts 库
+    google.charts.load('current', {packages: ['corechart', 'bar']});
+    google.charts.setOnLoadCallback(drawChart);
+
+    function drawChart() {
+        const data = google.visualization.arrayToDataTable([
+            ['系所', '書籍數量'],
+            ['資管系', departmentCounts['資管系']],
+            ['資傳系', departmentCounts['資傳系']],
+            ['資工系', departmentCounts['資工系']],
+            ['資英系', departmentCounts['資英系']]
+        ]);
+
+        const options = {
+            title: '各系所上傳書籍數量',
+            chartArea: {width: '50%'},
+            hAxis: {
+                title: '書籍數量',
+                minValue: 0
+            },
+            vAxis: {
+                title: '系所'
+            }
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+    }
+
+    // 页面加载时，加载已存储的书籍数据
+    window.onload = function() {
+        loadBooks();
+    };
+</script>
+
+</body>
+</html>
